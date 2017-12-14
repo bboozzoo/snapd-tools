@@ -4,7 +4,17 @@ import datetime
 import fileinput
 import re
 import sys
+import argparse
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='travis log analyzer')
+    parser.add_argument('--top', help='show top 10 tasks',
+                        action='store_true', default=False)
+    parser.add_argument('--summarize', help='summarize by machine type',
+                        action='store_true', default=False)
+    parser.add_argument('infile', nargs='?', type=argparse.FileType('r'),
+                        default=sys.stdin)
+    return parser.parse_args()
 
 class TravisInfo:
     id = ""
@@ -13,25 +23,24 @@ class TravisInfo:
     machine = "unknown"
 
     
-def scan(fname):
+def scan(infile):
     info_map = {}
-    with fileinput.input() as fp:
-        id = ""
-        for line in fp:
-            line = line.strip().replace("\x1b[0K","")
-            if line.startswith("travis_time:start:"):
-                ti = TravisInfo()
-                id = ti.id = line.split(":")[2]
-                info_map[ti.id] = ti
-            elif line.startswith("travis_time:end:"):
-                id = line.split(":")[2]
-                info_map[id].duration = datetime.timedelta(microseconds=int(line.split("duration=")[1])/1000.0)
-            elif id:
-                ti = info_map[id]
-                match = re.search(r"linode:([a-z0-9.-]+)...", line)
-                if match and ti.machine == "unknown":
-                    ti.machine = match.group(1)
-                ti.info += line + "\n"
+    id = ""
+    for line in infile:
+        line = line.strip().replace("\x1b[0K","")
+        if line.startswith("travis_time:start:"):
+            ti = TravisInfo()
+            id = ti.id = line.split(":")[2]
+            info_map[ti.id] = ti
+        elif line.startswith("travis_time:end:"):
+            id = line.split(":")[2]
+            info_map[id].duration = datetime.timedelta(microseconds=int(line.split("duration=")[1])/1000.0)
+        elif id:
+            ti = info_map[id]
+            match = re.search(r"linode:([a-z0-9.-]+)...", line)
+            if match and ti.machine == "unknown":
+                ti.machine = match.group(1)
+            ti.info += line + "\n"
     return info_map
 
 
@@ -70,15 +79,24 @@ def output_total_time(descr, info_map):
 
 
 if __name__ == "__main__":
-    info_map = scan(sys.argv[1])
+
+    opts = parse_arguments()
+
+    info_map = scan(opts.infile)
+
+
     output_total_time("total", info_map)
     #output_sorted_by_duration(info_map)
-    info_map_for_machine = summarize_by_machine(info_map)
-    for k, machine_info_map in info_map_for_machine.items():
-        output_total_time(k, machine_info_map)
 
-    print("\n\ntop-10 for each machine:\n")
-    for k, machine_info_map in info_map_for_machine.items():
-        output_sorted_by_duration(machine_info_map, 10)
-        print("------------------------------------------------------\n\n")
+    if opts.summarize or opts.top:
+        info_map_for_machine = summarize_by_machine(info_map)
 
+    if opts.summarize:
+        for k, machine_info_map in info_map_for_machine.items():
+            output_total_time(k, machine_info_map)
+
+    if opts.top:
+        print("\n\ntop-10 for each machine:\n")
+        for k, machine_info_map in info_map_for_machine.items():
+            output_sorted_by_duration(machine_info_map, 10)
+            print("------------------------------------------------------\n\n")
