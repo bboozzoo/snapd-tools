@@ -34,7 +34,7 @@ class TravisInfo:
     duration = datetime.timedelta(0)
     machine = "unknown"
     action = ''
-    error = ''
+    error = False
     typ = '<none>'
     test = '<none>'
     line_num = 0
@@ -47,7 +47,10 @@ class TravisInfo:
     def from_info(self, info):
         self.machine = info['system']
         self.action = info['action'].lower()
-        self.error = info['error']
+
+        if info['error']:
+            self.error = True
+
         if info['project']:
             self.typ = 'project'
         if info['test']:
