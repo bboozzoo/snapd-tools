@@ -182,14 +182,14 @@ def output_total_time(descr, info_map):
 
 
 def dump_csv(info_map):
-    fieldnames=['id', 'machine', 'duration_us', 'start', 'end', 'type', 'action', 'error', 'test', 'line', 'text']
+    fieldnames=['id', 'machine', 'duration', 'start', 'end', 'type', 'action', 'error', 'test', 'line', 'text']
     out = csv.DictWriter(sys.stdout, fieldnames)
     out.writeheader()
     for ti in info_map.values():
         out.writerow({
             'id': ti.id,
             'machine': ti.machine,
-            'duration_us': ti.duration.total_seconds(),
+            'duration': ti.duration.total_seconds(),
             'start': ti.start.timestamp() if ti.start else 0,
             'end': ti.end.timestamp() if ti.end else 0,
             'type': ti.typ,
