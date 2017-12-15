@@ -12,6 +12,8 @@ analyze.py --output-csv -q ../travis-log-timeout.txt > out.csv
 
 See `--help` for options.
 
+Thanks to @mvo5 for preparing the first version of the script.
+
 ### `pd.py`
 
 The script uses Pandas to analyze the CSV produced by `analyze.py` and display
@@ -69,3 +71,4 @@ $ ./pd.py --top --type test --machine debian-9-64 < out.csv
 See `--help** for options. 
 
 **NOTE**: you need to have Pandas installed.
+
