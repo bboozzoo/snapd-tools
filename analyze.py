@@ -41,6 +41,8 @@ class TravisInfo:
     typ = '<none>'
     test = '<none>'
     line_num = 0
+    start = None
+    end = None
 
     def __str__(self):
         return '{}: {} {} {} "{}" took: {} {}'.format(self.id, self.action,
@@ -100,16 +102,22 @@ def scan(infile):
                 info_map[id] = ti
 
         elif id and line.startswith("travis_time:end:"):
-            id = line.split(":")[2]
+            id, times = line.split(":")[2:4]
             if id not in info_map:
                 log.debug('-- unknown id %s', id)
                 continue
 
-            duration = int(line.split("duration=")[1])/1000.0
+            textstart, textend, textduration = times.split(",")
+            duration = int(textduration.split("duration=")[1])/1000.0
+            start = float(textstart.split('start=')[1])
+            end = float(textend.split('finish=')[1])
 
             ti = info_map[id]
             # print(info_map[id])
             ti.duration = datetime.timedelta(microseconds=duration)
+            ti.start = datetime.datetime.fromtimestamp(start/1000000000)
+            ti.end = datetime.datetime.fromtimestamp(end/1000000000)
+
             log.info(ti)
             log.debug('-- duration %s', ti.duration)
             log.debug('--     line "%s"', line)
@@ -174,7 +182,7 @@ def output_total_time(descr, info_map):
 
 
 def dump_csv(info_map):
-    fieldnames=['id', 'machine', 'duration_us', 'type', 'action', 'error', 'test', 'line', 'text']
+    fieldnames=['id', 'machine', 'duration_us', 'start', 'end', 'type', 'action', 'error', 'test', 'line', 'text']
     out = csv.DictWriter(sys.stdout, fieldnames)
     out.writeheader()
     for ti in info_map.values():
@@ -182,6 +190,8 @@ def dump_csv(info_map):
             'id': ti.id,
             'machine': ti.machine,
             'duration_us': ti.duration.total_seconds(),
+            'start': ti.start.timestamp() if ti.start else 0,
+            'end': ti.end.timestamp() if ti.end else 0,
             'type': ti.typ,
             'action': ti.action,
             'error': ti.error,
