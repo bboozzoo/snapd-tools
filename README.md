@@ -12,7 +12,7 @@ analyze.py --output-csv -q ../travis-log-timeout.txt > out.csv
 
 See `--help` for options.
 
-Thanks to @mvo5 for preparing the first version of the script.
+Thanks to [@mvo5](https://github.com/mvo5) for preparing the first version of the script.
 
 ### `pd.py`
 
