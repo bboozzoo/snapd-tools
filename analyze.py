@@ -43,6 +43,7 @@ class TravisInfo:
     line_num = 0
     start = None
     end = None
+    travis_job = ''
 
     def __str__(self):
         return '{}: {} {} {} "{}" took: {} {}'.format(self.id, self.action,
@@ -90,21 +91,40 @@ def extract_spread_info(line):
 def scan(infile):
     info_map = {}
     id = ""
+    in_env = False
+    travis_job = ""
+
+    slog = logging.getLogger('analyzer.scanner')
 
     for num, line in enumerate(infile):
         line = line.strip().replace("\x1b[0K", "")
-        if line.startswith("travis_time:start:"):
+        if line.startswith("travis_fold:start:env"):
+            in_env = True
+            slog.debug('env start, line %d', num)
+
+        elif line.startswith("travis_fold:end:env"):
+            in_env = False
+            slog.debug('env end, line %d', num)
+
+        elif in_env:
+            match = re.match(r'TRAVIS_JOB_NUMBER=(?P<job>[0-9.]+)', line)
+            if match:
+                travis_job = match['job']
+                slog.info("TRAVIS JOB: %s", travis_job)
+
+        elif line.startswith("travis_time:start:"):
             id = line.split(":")[2]
             if id not in info_map:
-                log.debug('-- new travis info id %s', id)
+                slog.debug('-- new travis info id %s', id)
                 ti = TravisInfo()
                 ti.id = id
+                ti.travis_job = travis_job
                 info_map[id] = ti
 
         elif id and line.startswith("travis_time:end:"):
             id, times = line.split(":")[2:4]
             if id not in info_map:
-                log.debug('-- unknown id %s', id)
+                slog.debug('-- unknown id %s', id)
                 continue
 
             textstart, textend, textduration = times.split(",")
@@ -118,12 +138,13 @@ def scan(infile):
             ti.start = datetime.datetime.fromtimestamp(start/1000000000)
             ti.end = datetime.datetime.fromtimestamp(end/1000000000)
 
-            log.info(ti)
-            log.debug('-- duration %s', ti.duration)
-            log.debug('--     line "%s"', line)
+            slog.info(ti)
+            slog.debug('-- duration %s', ti.duration)
+            slog.debug('--     line "%s"', line)
+
         elif id:
             if id not in info_map:
-                log.debug('-- unknown id %s', id)
+                slog.debug('-- unknown id %s', id)
                 continue
             # print(id)
             # print(line)
@@ -132,7 +153,7 @@ def scan(infile):
             if not ti.info:
                 info = extract_spread_info(line)
                 if not info:
-                    log.debug('discard non spread line "%s"', line)
+                    slog.debug('discard non spread line "%s"', line)
                     # not coming from spread, get rid of it
                     del info_map[id]
                     id = ""
@@ -141,7 +162,7 @@ def scan(infile):
                     # otherwise keep the first line of a fold only
                     ti.from_info(info)
                     ti.set_line_location(num, line)
-                    log.debug('-- fill starting travis info %s', ti)
+                    slog.debug('-- fill starting travis info %s', ti)
 
     return info_map
 
@@ -182,7 +203,11 @@ def output_total_time(descr, info_map):
 
 
 def dump_csv(info_map):
-    fieldnames=['id', 'machine', 'duration', 'start', 'end', 'type', 'action', 'error', 'test', 'line', 'text']
+    fieldnames=['id', 'travis_job',
+                'machine',
+                'duration', 'start', 'end',
+                'type', 'action', 'error', 'test',
+                'line', 'text']
     out = csv.DictWriter(sys.stdout, fieldnames)
     out.writeheader()
     for ti in info_map.values():
@@ -198,6 +223,7 @@ def dump_csv(info_map):
             'test': ti.test,
             'line': ti.line_num,
             'text': ti.info,
+            'travis_job': ti.travis_job,
         })
 
 
