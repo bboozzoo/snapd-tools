@@ -14,6 +14,9 @@ def parse_arguments():
     parser.add_argument('--type', help='task type', dest='typ',
                         choices=('test', 'project', 'any'),
                         default='any')
+    parser.add_argument('--action', help='action type', dest='action',
+                        choices=('preparing', 'executing', 'restoring', 'any'),
+                        default='any')
     parser.add_argument('--top', help='show top 10 tasks',
                         action='store_true', default=False)
     parser.add_argument('--machine', help='selected machine', default='')
@@ -31,6 +34,9 @@ def main(opts):
         values['machine'] = [opts.machine]
     if opts.typ != 'any':
         values['type'] = [opts.typ]
+    if opts.action != 'any':
+        values['action'] = [opts.action]
+
     if values:
         mask = df[list(values.keys())].isin(values).all(axis=1)
         df = df[mask]
