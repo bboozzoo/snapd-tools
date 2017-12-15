@@ -5,6 +5,7 @@ import re
 import sys
 import argparse
 import logging
+import csv
 
 
 log = logging.getLogger('analyzer')
@@ -20,6 +21,8 @@ def parse_arguments():
                         choices=('test', 'project', 'any'),
                         default='any')
     parser.add_argument('-d', '--debug', help='debugging',
+                        action='store_true', default=False)
+    parser.add_argument('--output-csv', help='dump parsed data into csv',
                         action='store_true', default=False)
     parser.add_argument('-q', '--quiet', help='quiet',
                         action='store_true', default=False)
@@ -170,8 +173,30 @@ def output_total_time(descr, info_map):
     print("total time for {}: {}".format(descr, total))
 
 
+def dump_csv(info_map):
+    fieldnames=['id', 'machine', 'duration_us', 'type', 'action', 'error', 'test', 'line', 'text']
+    out = csv.DictWriter(sys.stdout, fieldnames)
+    out.writeheader()
+    for ti in info_map.values():
+        out.writerow({
+            'id': ti.id,
+            'machine': ti.machine,
+            'duration_us': ti.duration.total_seconds(),
+            'type': ti.typ,
+            'action': ti.action,
+            'error': ti.error,
+            'test': ti.test,
+            'line': ti.line_num,
+            'text': ti.info,
+        })
+
+
 def main(opts):
     info_map = scan(opts.infile)
+
+    if opts.output_csv:
+        dump_csv(info_map)
+        return
 
     output_total_time("total", info_map)
 
