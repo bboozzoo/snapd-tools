@@ -1,0 +1,125 @@
+#!/bin/bash
+
+if [ -n "$V" ]; then
+    set -x
+fi
+
+PORT_BASE=59401
+
+make_port_number() {
+    echo $((PORT_BASE + RANDOM % 100))
+}
+
+usage() {
+    local self
+    self=$(basename "$0")
+    echo "usage: $self <image-path> <additional-qemu-options>"
+    echo
+    echo "Environment variables:"
+    echo "    V           enable verbose mode"
+    echo "    SNAPSHOT    defaults, to '-snapshot', passed verbatim to qemu,"
+    echo "                optionally set to 'n' to disable snapshot"
+    echo "    GUI         defaults to 'n', passed verbatim to qemu,"
+    echo "                optionally set to 'y' to enable graphical console,"
+    echo "                'spice' or 'virtio'"
+    echo "    ARCH        architecture, used in qemu-system-\${ARCH}"
+    echo "    DISKIF      disk interface to use (defaults to virtio)"
+    echo "    NETIF       network interface to use (defaults to virtio-net-pci)"
+    echo "    SSH_PORT    SSH port forwarding (defaults to random port in range $PORT_BASE-$((PORT_BASE+100)))"
+}
+
+case "$1" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+esac
+
+IMAGE=$1
+shift
+
+if [ -z "$IMAGE" ] || [ ! -e "$IMAGE" ]; then
+    echo "error: image path not provided, see --help"
+    exit 1
+fi
+
+SNAPSHOT=${SNAPSHOT-"-snapshot"}
+if [ "$SNAPSHOT" = "n" ]; then
+    SNAPSHOT=
+fi
+
+SOUND=${SOUND:-n}
+case "$SOUND" in
+    n)
+        ;;
+    y)
+        SOUND_ARGS="-device ac97"
+        ;;
+    *)
+        echo "unsupported GUI option '$SOUND'"
+        exit 1
+        ;;
+esac
+
+GUI=${GUI:-n}
+case "$GUI" in
+    n)
+        GUI_ARGS="-nographic"
+        ;;
+    spice)
+        SPICE_SOCKET=/tmp/vm_spice.$(make_port_number)
+        GUI_ARGS="-vga qxl \
+            -device virtio-serial-pci
+            -device virtserialport,chardev=spicechannel0,name=com.redhat.0 \
+            -chardev spicevmc,id=spicechannel0,name=vdagent \
+            -spice unix,addr=$SPICE_SOCKET,disable-ticketing"
+        ;;
+    virtio)
+        GUI_ARGS="-vga virtio -display gtk,gl=on"
+        ;;
+    virgl)
+        GUI_ARGS="-device virtio-vga-gl -display gtk,gl=on"
+        ;;
+    y)
+        GUI_ARGS=
+        ;;
+    *)
+        echo "unsupported GUI option '$GUI'"
+        exit 1
+        ;;
+esac
+
+DISKIF=${DISKIF:-virtio}
+NETIF=${NETIF:-virtio-net-pci}
+
+SSH_PORT="${SSH_PORT:-$(make_port_number)}"
+SERIAL_PORT="$((SSH_PORT+1))"
+MONITOR_PORT="$((SSH_PORT+2))"
+ARCH=${ARCH:=x86_64}
+
+echo "ports"
+echo "   SSH:     ssh -p $SSH_PORT localhost"
+echo "   serial:  telnet localhost $SERIAL_PORT"
+echo "   monitor: telnet localhost $MONITOR_PORT"
+if [ "$GUI" = "spice" ]; then
+    echo "   spice:   spice+unix://$SPICE_SOCKET"
+fi
+
+export TMPDIR=/tmp
+exec qemu-system-${ARCH} \
+                   -enable-kvm \
+                   $SNAPSHOT \
+                   -m 2048 \
+                   -device ${NETIF},netdev=mynet0 \
+                   -netdev user,id=mynet0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22 \
+                   -serial telnet:127.0.0.1:${SERIAL_PORT},server,nowait \
+                   -monitor telnet:127.0.0.1:${MONITOR_PORT},server,nowait \
+                   $GUI_ARGS \
+                   $SOUND_ARGS \
+                   -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
+                   -drive file="$IMAGE",if="$DISKIF",index=0 \
+                   "$@"
+
+# -hda "$IMAGE" \
+#-drive file="$IMAGE",if=virtio,index=0 \
+#
