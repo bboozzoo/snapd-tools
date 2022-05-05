@@ -1,0 +1,86 @@
+#!/usr/bin/python3
+
+import socket
+import logging
+import argparse
+import subprocess
+import time
+import sys
+
+
+DEFAULT_PORT = 59468
+DEFAULT_HOST = "localhost"
+
+
+class Spinner:
+    chars = "-\|/"
+
+    def __init__(self):
+        self._idx = 0
+
+    def spin(self):
+        self._idx = (self._idx + 1) % len(self.chars)
+
+    def print(self, out):
+        out.write("\r")
+        out.write(self.chars[self._idx])
+        out.write(" ")
+
+    def reset(self):
+        self._idx = 0
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="telnet wait loop")
+    parser.add_argument(
+        "port",
+        type=int,
+        help="port number (default %(default)s)",
+        metavar="PORT",
+        default=DEFAULT_PORT,
+        nargs="?",
+    )
+    parser.add_argument(
+        "-k", "--keep", help="keep reconnecting after telnet exits", action="store_true"
+    )
+
+    return parser.parse_args()
+
+
+def main(opts):
+    logging.debug("connect to %s:%s...", DEFAULT_HOST, opts.port)
+    spinner = Spinner()
+    try:
+        while True:
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect((DEFAULT_HOST, opts.port))
+                    logging.info("connected, port is open")
+            except OSError:
+                # logging.debug("connect failed... waiting")
+                spinner.spin()
+                spinner.print(sys.stderr)
+                time.sleep(1)
+                continue
+
+            spinner.reset()
+            logging.debug("host is live at port %s, trying telnet", opts.port)
+            try:
+                subprocess.check_call(["telnet", DEFAULT_HOST, "{}".format(opts.port)])
+                if opts.keep:
+                    logging.warning("retrying connection as requested")
+                    continue
+            except subprocess.CalledProcessError as cpe:
+                logging.debug(
+                    "telnet exited with status %s, retrying...", cpe.returncode
+                )
+                continue
+            break
+    except KeyboardInterrupt:
+        logging.debug("interrupted")
+
+
+if __name__ == "__main__":
+    opts = parse_arguments()
+    logging.basicConfig(level=logging.DEBUG)
+    main(opts)
