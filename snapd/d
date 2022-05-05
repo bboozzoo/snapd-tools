@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+
+import argparse
+import subprocess
+import os
+import os.path
+import logging
+import shutil
+import shlex
+
+
+DESTDIR = os.getenv("DESTDIR", "")
+STATIC_BUILD_FLAGS = "-ldflags='-linkmode=external -extldflags=-static'"
+BINDIR = "/usr/bin"
+LIBEXECDIR = "/usr/lib/snapd"
+DIRS = {
+    "snap": BINDIR
+    # the rest goes to libexecdir
+}
+DEFAULT_FLAGS = "-ldflags='' -buildmode=pie"
+FLAGS = {
+    "snap-exec": STATIC_BUILD_FLAGS,
+    "snap-bootstrap": STATIC_BUILD_FLAGS,
+    "snap-update-ns": STATIC_BUILD_FLAGS,
+    "snap-failure": STATIC_BUILD_FLAGS,
+    # the rest has no flags
+    #"snapd": STATIC_BUILD_FLAGS,
+}
+TAGS = {
+    "snap": "-tags 'nomanagers nosecboot'",
+    # the rest has no tags
+    # "snapd": "-tags 'nosecboot'",
+    "snapd": "-tags 'withtestkeys'",
+    "snap-bootstrap": "-tags 'osusergo'"
+}
+
+
+def pre_action(what):
+    if what == "snapd" and not DESTDIR:
+        logging.debug("stopping snapd service")
+        subprocess.run(shlex.split("sudo systemctl stop snapd"), check=True)
+
+
+def post_action(what):
+    if what == "snapd" and not DESTDIR:
+        logging.debug("starting snapd service")
+        subprocess.run(shlex.split("sudo systemctl start snapd"), check=True)
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="build helper")
+    parser.add_argument("-b", "--just-build", action="store_true", help="just build")
+    parser.add_argument("-t", "--tags", help="build tags to use (overrides defaults, if any)")
+    parser.add_argument('--libexecdir', help='snapd libexecdir', default=LIBEXECDIR)
+    parser.add_argument("what", help="binary to build")
+    return parser.parse_known_args()
+
+
+def main(opts, rest):
+    test_bin = "test-" + opts.what
+    cmd = "go build {flags} {tags} {rest} -o {output} github.com/snapcore/snapd/cmd/{cmd}".format(
+        flags=FLAGS.get(opts.what, DEFAULT_FLAGS),
+        tags="-tags '{}'".format(opts.tags) if opts.tags else TAGS.get(opts.what, ""),
+        output=test_bin,
+        cmd=opts.what,
+        rest=" ".join(rest),
+    )
+
+    logging.debug('running "%s"', cmd)
+    subprocess.run(shlex.split(cmd), check=True)
+
+    sz = os.path.getsize(test_bin)
+    logging.debug("binary size: %.2f kB", sz / 1024.0)
+    if opts.just_build:
+        logging.debug("skipping installation")
+        return
+
+    # install
+    pre_action(opts.what)
+
+    dst = os.path.join(DIRS.get(opts.what, opts.libexecdir), opts.what)
+    if DESTDIR:
+        logging.debug('DESTDIR set to %s', DESTDIR)
+        dst = os.path.join(DESTDIR, os.path.relpath(dst, start='/'))
+    logging.debug('destination: %s', dst)
+    subprocess.run(
+        shlex.split("sudo cp -v {src} {dst}".format(src=test_bin, dst=dst)), check=True
+    )
+
+    post_action(opts.what)
+
+
+if __name__ == "__main__":
+    opts, rest = parse_arguments()
+    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(message)s")
+
+    main(opts, rest)

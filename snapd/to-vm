@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -xue
+
+port="${1:-}"
+user="${2:-guest}"
+
+if ! test -n "$port" ; then
+    echo "port unset"; exit 1
+fi
+
+ssh-unsafe -p "$port" "$user"@localhost "mkdir -p ~/snapd"
+rsync -avz -e "ssh-unsafe -p $port" . "$user"@localhost:~/snapd/

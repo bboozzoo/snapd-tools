@@ -1,0 +1,35 @@
+#!/usr/bin/python
+
+import os
+import sys
+import subprocess
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
+CONTAINER = os.getenv('CONTAINER', '20.04-kernel')
+GOROOT = os.getenv('GOROOT', None)
+if GOROOT is None:
+    raise RuntimeError("GOROOT is unset")
+HOME = os.getenv('HOME', None)
+if HOME is None:
+    raise RuntimeError("HOME is unset")
+
+# /home is mapped to /home
+logging.info("assumes a no privileged container %s", CONTAINER)
+# start the container
+subprocess.run(["podman", "start", CONTAINER])
+
+script = "cd {cwd}; export GOROOT={goroot}; export PATH=$PATH:$GOROOT/bin; echo $PATH; ./d {args}".format(
+    cwd=os.getcwd(),
+    goroot=GOROOT,
+    args=' '.join(sys.argv[1:]),
+)
+logging.debug("running script: '%s'", script)
+podman_build = [ "podman",
+                 "exec",
+                 "-e", "HOME="+HOME,
+                 CONTAINER,
+                 "bash", "-c", script]
+logging.debug("command: %s", podman_build)
+subprocess.run(podman_build);

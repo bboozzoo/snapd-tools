@@ -1,0 +1,75 @@
+#!/bin/bash
+
+set -xe
+
+SNAPD_SNAP_DIR=/home/maciek/work/canonical/image/snapd-snap
+
+build_one() {
+    (
+        if [ -n "$ARM" ]; then
+            export CGO_ENABLED=1
+            export GOOS=linux
+            export GOARCH=arm
+            export GOARM=7
+            export CC=arm-linux-gnueabihf-gcc
+            . /home/maciek/code/toolchains/setup
+        fi
+        go build "$@"
+    )
+}
+
+build() {
+    build_one -o test-snapd -tags withtestkeys github.com/snapcore/snapd/cmd/snapd
+    build_one -o test-snap github.com/snapcore/snapd/cmd/snap
+    build_one -o test-snap-seccomp github.com/snapcore/snapd/cmd/snap-seccomp
+}
+
+deploy() {
+    build
+    tar c test-snap* | ssh-unsafe "$login" "tar xvf -"
+    ssh-unsafe "$login" 'sudo mount -o bind $PWD/test-snap /usr/bin/snap'
+    ssh-unsafe "$login" 'sudo systemctl stop snapd && sudo mount -o bind $PWD/test-snapd /usr/lib/snapd/snapd'
+}
+
+repack() {
+    build
+    cp test-snapd "$SNAPD_SNAP_DIR"/usr/lib/snapd/snapd
+    cp test-snap-seccomp "$SNAPD_SNAP_DIR"/usr/lib/snapd/snap-seccomp
+    cp test-snap "$SNAPD_SNAP_DIR"/usr/bin/snap
+    find "$SNAPD_SNAP_DIR" -name 'snapd_*.snap' -exec rm -f {} \;
+    (set -e; cd "$SNAPD_SNAP_DIR" && snap pack)
+}
+
+update_seed() {
+    repack
+    what=$(find "$SNAPD_SNAP_DIR" -name 'snapd_*.snap')
+    test -n "$what"
+    cat "$what" | ssh-unsafe "$login" "cd /var/lib/snapd/seed/snaps && sudo tee snapd_x1.snap > /dev/null"
+}
+
+opt=$1
+shift
+
+login=$1
+
+case "$opt" in
+    b)
+        build
+        ;;
+    d)
+        deploy
+        ;;
+    r)
+        repack
+        ;;
+    u)
+        update_seed
+        ;;
+    o)
+        build_one "$@"
+        ;;
+    *)
+        echo "unexpected"
+        exit 1
+        ;;
+esac
