@@ -1,0 +1,12 @@
+#!/bin/sh
+
+set -e
+set -x
+
+. ./build-common
+
+extra_snaps=$(extra_snaps_args)
+
+MODEL=${MODEL:-pc-20.model}
+#./build "$MODEL" -w $PWD/image-home  --channel edge $extra_snaps "$@"
+./build "$MODEL" -w $PWD/image-home  $extra_snaps "$@"

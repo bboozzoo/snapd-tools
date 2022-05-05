@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+set -x
+set -u
+
+. ./build-common
+
+extra_snaps=$(extra_snaps_args)
+
+./build $MODEL -w $PWD/image-home ${extra_snaps:-} "$@"

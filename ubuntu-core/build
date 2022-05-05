@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+set -x
+
+export LC_ALL=C
+# for old ubuntu-image
+export PYTHONPATH=$HOME/work/canonical/ubuntu-image
+export PATH=$HOME/work/canonical/ubuntu-image:$PATH
+
+ubuntu-image snap "$@"

@@ -1,0 +1,12 @@
+extra_snaps_args() {
+    local extra_snaps
+    if [ -n "${SNAPS_DIR:-}" ]; then
+        for sn in "$SNAPS_DIR"/*.snap; do
+            if [[ -n "${SKIP_SNAP:-}" ]] && echo "${SKIP_SNAP}:" | grep -Eq "$(basename ${sn/_*.snap}):"; then
+                continue
+            fi
+            extra_snaps="${extra_snaps:-} --snap=$sn"
+        done
+    fi
+    echo "${extra_snaps:-}"
+}
