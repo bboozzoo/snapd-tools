@@ -1,0 +1,25 @@
+#!/bin/sh -xe
+
+DIR=pc-gadget-resign
+if [ -d "$DIR" ]; then
+    echo "work directory $DIR already present"
+    exit 1
+fi
+
+SNAP="$1"
+if [ -z "$SNAP" ]; then
+	echo "error: snap file missing"
+	echo "usage: <$(basename $0)> <pc-gadget>.snap"
+	exit 1
+fi
+
+if [ -f "$1" ]; then
+    unsquashfs -d "$DIR" "$SNAP"
+elif [ -d "$1" ] && [ -f "$1/meta/gadget.yaml" ]; then
+    echo "using unpacked snap directory $1"
+    DIR="$1"
+fi
+
+sbattach --remove "$DIR"/shim.efi.signed
+sbsign --key snakeoil/PkKek-1-snakeoil.key --cert snakeoil/PkKek-1-snakeoil.pem --output "$DIR"/shim.efi.signed "$DIR"/shim.efi.signed
+snap pack --filename=pc-gadget.snap "$DIR"
