@@ -1,0 +1,76 @@
+#!/bin/sh
+
+TPM=/var/snap/swtpm-mvo/current/
+IMG=${1:-image-home/pc.img}
+OVMFDIR=./ovmf/OVMF
+
+PORT_BASE=59401
+
+make_port_number() {
+    echo $((PORT_BASE + RANDOM % 100))
+}
+
+sudo rm -f /var/snap/swtpm-mvo/current/tpm2-00.permall
+sudo snap restart swtpm-mvo
+until [ -S /var/snap/swtpm-mvo/current/swtpm-sock ]; do
+    echo "-- waiting for swtpm socket"
+    sleep 1
+done
+sudo chmod a+rw /var/snap/swtpm-mvo/current/swtpm-sock
+
+
+OVMF_VARS=${OVMF_VARS-OVMF_VARS.snakeoil.fd}
+cp -v $OVMFDIR/$OVMF_VARS .
+
+
+SSH_PORT="${SSH_PORT:-$(make_port_number)}"
+SERIAL_PORT="$((SSH_PORT+1))"
+MONITOR_PORT="$((SSH_PORT+2))"
+
+echo "ports"
+echo "   SSH:     ssh -p $SSH_PORT localhost"
+echo "   serial:  telnet localhost $SERIAL_PORT"
+echo "   monitor: telnet localhost $MONITOR_PORT"
+
+GUI=${GUI:-virtio}
+case "$GUI" in
+    n)
+        GUI_ARGS="-nographic"
+        ;;
+    spice)
+        SPICE_SOCKET=/tmp/vm_spice.$(make_port_number)
+        GUI_ARGS="-vga qxl \
+            -device virtio-serial-pci
+            -device virtserialport,chardev=spicechannel0,name=com.redhat.0 \
+            -chardev spicevmc,id=spicechannel0,name=vdagent \
+            -spice unix,addr=$SPICE_SOCKET,disable-ticketing"
+        ;;
+    virtio)
+        GUI_ARGS="-vga virtio -display gtk,gl=on"
+        ;;
+    virgl)
+        GUI_ARGS="-device virtio-vga-gl -display gtk,gl=on"
+        ;;
+    y)
+        GUI_ARGS=
+        ;;
+    *)
+        echo "unsupported GUI option '$GUI'"
+        exit 1
+        ;;
+esac
+
+qemu-system-x86_64 \
+     -enable-kvm \
+     $GUI_ARGS \
+     -serial telnet:127.0.0.1:${SERIAL_PORT},server,nowait \
+     -monitor telnet:127.0.0.1:${MONITOR_PORT},server,nowait \
+     -netdev user,id=mynet0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22 \
+     -device virtio-net-pci,netdev=mynet0 \
+  $SPICE \
+  -smp 4 -m 1024 -machine q35 -global ICH9-LPC.disable_s3=1 -cpu host \
+  -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
+  -drive file=./OVMF_CODE.secboot.fd,if=pflash,format=raw,unit=0,readonly=on \
+  -drive "file=./$OVMF_VARS,if=pflash,format=raw,unit=1" \
+  -chardev socket,id=chrtpm,path="$TPM"/swtpm-sock -tpmdev emulator,id=tpm0,chardev=chrtpm -device tpm-tis,tpmdev=tpm0 \
+  -drive file="$IMG",if=none,format=raw,id=disk1,snapshot=on -device virtio-blk-pci,drive=disk1,bootindex=1
