@@ -1,0 +1,23 @@
+#!/bin/bash -ex
+
+if [ "$#" -ne 2 ] || [ "$1" = "--help" ]; then
+    echo "usage: $0 <key-name> <system-user-assertion-json>"
+    exit 1
+fi
+
+# sign the assertion
+sysUser=$(snap sign -k $1 < $2)
+
+accountID=$(echo "$sysUser" | grep -Po "authority-id:\s+\K.*")
+signingKeySha=$(echo "$sysUser" | grep -Po "sign-key-sha3-384:\s+\K.*" )
+
+{
+    # get the account key assertion from the store
+    snap known --remote account "account-id=$accountID"
+    echo ""
+    # get the signing account-key assertion from the store
+    snap known --remote account-key "public-key-sha3-384=$signingKeySha"
+    echo ""
+    echo "$sysUser"
+
+} > auto-import.assert
