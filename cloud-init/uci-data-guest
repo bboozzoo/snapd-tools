@@ -1,0 +1,30 @@
+#cloud-config
+
+datasource_list: [ NoCloud, None ]
+# default user password, does not work?
+password: guest
+chpasswd:
+  expire: False
+
+users:
+  - name: guest
+    # 'guest', does not work?
+    passwd: $1$ATssWWmG$8BE/eZ6.STwcltfuLYlly1
+    # for sudo
+    groups: wheel
+    # sudo without password
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    # explicitly set the shell
+    shell: /bin/bash
+    ssh-authorized-keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA1LCRbWnZ/GmM+LZex06HjNyw0aixYbD3P8mfsNHcBV6/LNk7vxw7+5nhooaBlkv1X/hpc/q3BnGy2W4goJ8aEL3JliJl/+4ijdSEwYXKZj0PpFPY8ir4VOFzVlPIX4SoHgheSo5it7zFRBpHMtDqSmgoWmzFKLX3qg144Cv9Lxkqpkx0ndpflYsLz8hH9WT85OjNvVI51lxoTq86XmU0rSzQkT0vpNwGRHSs0HS197d4ym9f1dGFTflWaKmhrquvBWTztHvfhxgZz6OdEeyywAdQBBi3sbWkRuwjZ/aX5K3obwIJL0iJN8hwf64Wt5plYQVhIrNlqVCU8ZRLuzLAGw== maciek@corsair
+
+# for Ubuntu Core
+snap:
+  commands:
+    # force add the user
+    00: snap create-user --sudoer --force-managed maciek.borzecki@gmail.com
+
+# get a debug shell
+bootcmd:
+    - systemctl enable --now debug-shell.service
