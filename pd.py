@@ -29,6 +29,9 @@ def main(opts):
 
     df = pd.read_csv(opts.infile)
 
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_colwidth', 120)
+
     values = {}
     if opts.machine:
         values['machine'] = [opts.machine]
