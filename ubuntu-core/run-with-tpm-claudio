@@ -1,6 +1,6 @@
 #!/bin/sh
 
-TPM=/var/snap/swtpm-mvo/current/
+TPM=/var/snap/test-snapd-swtpm/current/
 IMG=${1:-image-home/pc.img}
 OVMFDIR=./ovmf/OVMF
 
@@ -10,13 +10,13 @@ make_port_number() {
     echo $((PORT_BASE + RANDOM % 100))
 }
 
-sudo rm -f /var/snap/swtpm-mvo/current/tpm2-00.permall
-sudo snap restart swtpm-mvo
-until [ -S /var/snap/swtpm-mvo/current/swtpm-sock ]; do
+sudo rm -f "$TPM/tpm2-00.permall"
+sudo snap restart test-snapd-swtpm
+until [ -S "$TPM/swtpm-sock" ]; do
     echo "-- waiting for swtpm socket"
     sleep 1
 done
-sudo chmod a+rw /var/snap/swtpm-mvo/current/swtpm-sock
+sudo chmod a+rw "$TPM/swtpm-sock"
 
 
 OVMF_VARS=${OVMF_VARS-OVMF_VARS.snakeoil.fd}
@@ -70,7 +70,8 @@ qemu-system-x86_64 \
   $SPICE \
   -smp 4 -m 1024 -machine q35 -global ICH9-LPC.disable_s3=1 -cpu host \
   -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
-  -drive file=./OVMF_CODE.secboot.fd,if=pflash,format=raw,unit=0,readonly=on \
-  -drive "file=./$OVMF_VARS,if=pflash,format=raw,unit=1" \
+  -drive file=$OVMFDIR/OVMF_CODE.secboot.fd,if=pflash,format=raw,unit=0,readonly=on \
+  -drive "file=$OVMF_VARS,if=pflash,format=raw,unit=1" \
   -chardev socket,id=chrtpm,path="$TPM"/swtpm-sock -tpmdev emulator,id=tpm0,chardev=chrtpm -device tpm-tis,tpmdev=tpm0 \
   -drive file="$IMG",if=none,format=raw,id=disk1,snapshot=on -device virtio-blk-pci,drive=disk1,bootindex=1
+
