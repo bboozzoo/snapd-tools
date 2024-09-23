@@ -5,6 +5,8 @@
 # @version 0.1
 
 # from https://git.kernel.org/pub/scm/linux/kernel/git/jejb/efitools.git/tree/Make.rules
+# also: https://gist.github.com/rgl/fd1104c9d63843def5a111863df99898
+#
 MYGUID = 11111111-0000-1111-0000-123456789abc
 
 %.crt:
@@ -13,6 +15,9 @@ MYGUID = 11111111-0000-1111-0000-123456789abc
 %.esl: %.crt
 	cert-to-efi-sig-list -g $(MYGUID) $< $@
 
+%.cer: %.crt
+	openssl x509 -in $< -out $@ -outform der
+
 getcert = $(shell if [ "$(1)" = "PK" -o "$(1)" = "KEK" ]; then echo "-c PK.crt -k PK.key"; else echo "-c KEK.crt -k KEK.key"; fi)
 getvar = $(shell if [ "$(1)" = "PK" -o "$(1)" = "KEK" ]; then echo $(1); else echo db; fi)
 
@@ -20,10 +25,10 @@ getvar = $(shell if [ "$(1)" = "PK" -o "$(1)" = "KEK" ]; then echo $(1); else ec
 	sign-efi-sig-list $(call getcert,$*) $(call getvar,$*) $< $@
 
 %-update.auth: %.esl PK.crt KEK.crt sign-efi-sig-list
-	./sign-efi-sig-list -a $(call getcert,$*) $(call getvar,$*) $< $@
+	sign-efi-sig-list -a $(call getcert,$*) $(call getvar,$*) $< $@
 
 %-blacklist.auth: %-blacklist.esl KEK.crt sign-efi-sig-list
-	./sign-efi-sig-list -a -c KEK.crt -k KEK.key dbx $< $@
+	sign-efi-sig-list -a -c KEK.crt -k KEK.key dbx $< $@
 
 tree/%: %
 	mkdir -p $$(dirname $@)
@@ -33,16 +38,21 @@ clean:
 	rm -rfv ./tree
 	rm -fv disk.img
 
-disk.img: tree/PK.auth tree/KEK.auth
+clean-certs:
+	rm -fv PK.cer PK.crt
+	rm -fv KEK.cer KEK.crt
+
+disk.img: tree/PK.auth tree/PK.cer tree/KEK.cer tree/KEK.auth ./repart.d/*.conf
 	rm -f disk.img
 	systemd-repart \
 		--empty=create \
-		--size=32M \
+		--size=auto \
 		--copy-source=./tree/ \
 		--offline=true \
 		--definitions=./repart.d/ \
 		disk.img
 
-.PHONY: clean
+.PHONY: clean clean-certs
+.PRECIOUS: %.esl %.cer %.crt %.auth
 
 # end
