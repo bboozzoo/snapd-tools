@@ -17,6 +17,9 @@ SIGNING_KEYS = sign.crt
 %.esl: %.crt
 	cert-to-efi-sig-list -g $(MYGUID) $< $@
 
+%-blacklist.esl: %.crt
+	cert-to-efi-sig-list -g $(MYGUID) $< $@
+
 %.cer: %.crt
 	openssl x509 -in $< -out $@ -outform der
 
