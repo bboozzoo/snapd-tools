@@ -9,6 +9,8 @@
 #
 MYGUID = 11111111-0000-1111-0000-123456789abc
 
+SIGNING_KEYS = sign.crt
+
 %.crt:
 	openssl req -new -x509 -newkey rsa:2048 -subj "/CN=$*/" -keyout $*.key -out $@ -days 3650 -nodes -sha256
 
@@ -24,11 +26,14 @@ getvar = $(shell if [ "$(1)" = "PK" -o "$(1)" = "KEK" ]; then echo $(1); else ec
 %.auth: %.esl PK.crt KEK.crt
 	sign-efi-sig-list $(call getcert,$*) $(call getvar,$*) $< $@
 
-%-update.auth: %.esl PK.crt KEK.crt sign-efi-sig-list
+%-update.auth: %.esl PK.crt KEK.crt
 	sign-efi-sig-list -a $(call getcert,$*) $(call getvar,$*) $< $@
 
-%-blacklist.auth: %-blacklist.esl KEK.crt sign-efi-sig-list
+%-blacklist.auth: %-blacklist.esl KEK.crt
 	sign-efi-sig-list -a -c KEK.crt -k KEK.key dbx $< $@
+
+db.esl: $(patsubst %.crt,%.esl,$(SIGNING_KEYS))
+	cat $^ > $@
 
 tree/%: %
 	mkdir -p $$(dirname $@)
@@ -42,7 +47,7 @@ clean-certs:
 	rm -fv PK.cer PK.crt
 	rm -fv KEK.cer KEK.crt
 
-disk.img: tree/PK.auth tree/PK.cer tree/KEK.cer tree/KEK.auth ./repart.d/*.conf
+disk.img: tree/PK.cer tree/KEK.cer ./repart.d/*.conf
 	rm -f disk.img
 	systemd-repart \
 		--empty=create \
