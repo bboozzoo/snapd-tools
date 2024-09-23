@@ -10,6 +10,7 @@
 MYGUID = 11111111-0000-1111-0000-123456789abc
 
 SIGNING_KEYS = sign.crt
+BLACKLIST_KEYS = bogus.crt
 
 %.crt:
 	openssl req -new -x509 -newkey rsa:2048 -subj "/CN=$*/" -keyout $*.key -out $@ -days 3650 -nodes -sha256
@@ -36,6 +37,9 @@ getvar = $(shell if [ "$(1)" = "PK" -o "$(1)" = "KEK" ]; then echo $(1); else ec
 	sign-efi-sig-list -a -c KEK.crt -k KEK.key dbx $< $@
 
 db.esl: $(patsubst %.crt,%.esl,$(SIGNING_KEYS))
+	cat $^ > $@
+
+dbx.esl: $(patsubst %.crt,%-blacklist.esl,$(BLACKLIST_KEYS))
 	cat $^ > $@
 
 tree/%: %
