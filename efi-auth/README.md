@@ -104,7 +104,16 @@ Variables may be marked as immutable, switch them to mutable (and maybe switch
 back to immutable later):
 
 ``` sh
-chattr -i /sys/firmware/efi/efivars/dbx-d719b2cb-3d3a-4596-a3bc-dad00e67656f 
+chattr -i /sys/firmware/efi/efivars/{PK,KEK,db,dbx}-*
+```
+
+To subsequently clear everything, use `empty.auth` generated in the data set:
+
+``` sh
+root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f empty.auth PK
+root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f empty.auth KEK
+root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f empty.auth db
+root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f empty.auth dbx
 ```
 
 ### quirks/notes

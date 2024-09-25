@@ -67,7 +67,12 @@ disk.img: tree/PK.cer tree/KEK.cer ./repart.d/*.conf
 		--definitions=./repart.d/ \
 		disk.img
 
-dataset: PK.auth KEK.auth db.auth dbx-blacklist.auth
+empty.auth: PK.crt
+	rm -f empty
+	touch empty
+	sign-efi-sig-list -c PK.crt -k PK.key PK empty $@
+
+dataset: PK.auth KEK.auth db.auth dbx-blacklist.auth empty.auth
 	$(MAKE) dbx-1-update-blacklist.auth BLACKLIST_KEYS='$(BLACKLIST_KEYS) other-bogus.crt'
 
 clean:
