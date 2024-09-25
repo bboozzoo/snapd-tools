@@ -85,6 +85,26 @@ dbx: List 0, type X509
 Variable MokList has no entries
 ```
 
+or manually importing from `*.auth` files:
+
+``` sh
+root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f PK.auth PK
+root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f KEK.auth KEK
+root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f db.auth db
+root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f dbx-update-blacklist.auth
+```
+
+Variarbles may be marked as immutable, switch them back to mutable:
+
+``` sh
+chattr -i /sys/firmware/efi/efivars/dbx-d719b2cb-3d3a-4596-a3bc-dad00e67656f 
+```
+
+### quirks/notes
+
+- crucial difference if payload is built for append or write
+- cannot import an empty esl to dbx (?)
+
 ## fwupd
 
 ``` sh
@@ -108,7 +128,7 @@ QEMU Standard PC (Q35 + ICH9, 2009)
 │     Device Flags:       • Internal device                                   
 │                         • Updatable                           
 │                         • Needs a reboot after installation   
-│                         • Device is usable for the duration of the update
+│                        • Device is usable for the duration of the update
 │                         • Only version upgrades are allowed   
 │                         • Signed Payload                                                                                                                                                     
 ...
@@ -123,3 +143,81 @@ root@localhost:/snap/fwupd/6368# ./bin/dbxtool  -l
    1: {11111111-0000-1111-0000-123456789abc} {x509} ca4fbfb454920b25fbf07e2385242eba4e110024ab3d1c55883d78128b4400da
 
 ```
+
+GUID is constructed using an identifier eg.
+`UEFI\CRT_45C7F7514B85E8CACEFDBC55EEE345BCFE6511AEF5A1EE48D12A24C0A6A0D2B0&ARCH_X64`
+which is constructed at runtime. 
+
+``` python
+import uuid
+print(uuid.uuid5(uuid.NAMESPACE_DNS, r"UEFI\CRT_45C7F7514B85E8CACEFDBC55EEE345BCFE6511AEF5A1EE48D12A24C0A6A0D2B0&ARCH_X64"))
+c8fa151a-b08d-5945-80ba-06dfb62481d9
+```
+
+LVFS metadata firmware identifier must use the same GUID to match it with the
+update.
+
+``` xml
+<component type="firmware">
+  <id>org.linuxfoundation.dbx.x64.firmware</id>
+  <name>Secure Boot dbx</name>
+  <name_variant_suffix>x64</name_variant_suffix>
+  <summary>UEFI Secure Boot Forbidden Signature Database</summary>
+  <provides>
+    <!-- GUID from above -->
+    <firmware type="flashed">c8fa151a-b08d-5945-80ba-06dfb62481d9</firmware>
+  </provides>
+  ...
+</component>
+```
+
+Pack everything into a cab file:
+
+``` sh
+$ gcab -c -v dbx-v1111.cab dbx.auth dbx.auth.metainfo.xml
+dbx.auth
+dbx.auth.metainfo.xml
+```
+
+and place in the vendor directory:
+
+``` sh
+cp dbx-v2.cab /var/snap/fwupd/common/share/fwupd/remotes.d/vendor/firmware/
+fwupd.fwupdtool refresh
+```
+
+### Update
+
+To update
+
+``` sh
+fwupd.fwupdtool refresh
+fwupd.fwupdtool update --force --verbose 362301da643102b9f38477387e2193e57abaa590
+```
+
+No reboot necessary though. Verify with efi-readvar:
+
+
+``` sh
+root@localhost:/home/maciek-borzecki# efitools.tool efi-readvar -v dbx
+Variable dbx, length 1646
+dbx: List 0, type X509
+    Signature 0, size 789, owner 11111111-0000-1111-0000-000000000000
+        Subject:
+            CN=bogus
+        Issuer:
+            CN=bogus
+dbx: List 1, type X509
+    Signature 0, size 801, owner 11111111-0000-1111-0000-000000000000
+        Subject:
+            CN=other-bogus
+        Issuer:
+            CN=other-bogus
+```
+
+
+## Links
+
+- LVFS metadata https://lvfs.readthedocs.io/en/latest/metainfo.html
+- LVFS uploading firmware https://lvfs.readthedocs.io/en/latest/upload.html
+- fwupd remotes https://github.com/fwupd/fwupd/blob/main/data/remotes.d/README.md
