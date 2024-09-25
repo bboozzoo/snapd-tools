@@ -1,4 +1,4 @@
-# prep
+# Data set
 
 ``` sh
 
@@ -47,6 +47,8 @@ qemu-system-x86_64 -enable-kvm -smp 4 -m 2048 -cpu host -machine q35 -global ICH
 
 ## efitools
 
+Initial check:
+
 ``` sh
 $ sudo efitools.tool efi-readvar   
 Variable PK, length 811                                   
@@ -86,16 +88,20 @@ dbx: List 0, type X509
 Variable MokList has no entries
 ```
 
-or manually importing from `*.auth` files:
+Manually importing from `*.auth` files:
 
 ``` sh
 root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f PK.auth PK
 root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f KEK.auth KEK
 root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f db.auth db
-root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f dbx-update-blacklist.auth
+root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -f dbx-blacklist.auth
+
+# or subsequent update
+root@localhost:/home/maciek-borzecki# efitools.tool efi-updatevar -a -f dbx-update-blacklist.auth
 ```
 
-Variarbles may be marked as immutable, switch them back to mutable:
+Variables may be marked as immutable, switch them to mutable (and maybe switch
+back to immutable later):
 
 ``` sh
 chattr -i /sys/firmware/efi/efivars/dbx-d719b2cb-3d3a-4596-a3bc-dad00e67656f 
@@ -156,7 +162,7 @@ c8fa151a-b08d-5945-80ba-06dfb62481d9
 ```
 
 LVFS metadata firmware identifier must use the same GUID to match it with the
-update. Use the following template:
+update. Use the following template (fill GUID, CHECKSUM etc):
 
 ``` xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -249,3 +255,5 @@ dbx: List 1, type X509
 - LVFS metadata https://lvfs.readthedocs.io/en/latest/metainfo.html
 - LVFS uploading firmware https://lvfs.readthedocs.io/en/latest/upload.html
 - fwupd remotes https://github.com/fwupd/fwupd/blob/main/data/remotes.d/README.md
+- useful notes: https://www.rodsbooks.com/efi-bootloaders/controlling-sb.html
+- even more useful notes: https://docs.slackware.com/howtos:security:enabling_secure_boot
