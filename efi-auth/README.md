@@ -2,19 +2,20 @@
 
 ``` sh
 
-make tree/PK.cer tree/KEK.cer
-
 # grab snakeoil keys
 cp PkKek-1-snakeoil.pem PkKek-1-snakeoil.crt
 
-make sign.esl MYGUID=11111111-0000-1111-0000-123456789abc
-make PkKek-1-snakeoil.esl MYGUID=11111111-0000-2222--0000-123456789abc
+make clean
+make clean-disk
 
-make db.esl SIGNING_KEYS='sign.crt PkKek-1-snakeoil.crt'
-make dbx.esl BLACLIST_KEYS='bogus.crt'
+# generate data
+# signing keys: sign.crt and the snakeoil key
+# initial dbx blacklists bogus.crt, and an update which blacklists other-bogus.crt
+make dataset SIGNING_KEYS='sign.crt PkKek-1-snakeoil.crt' BLACKLIST_KEYS='bogus.crt'
 
+# prepare disk for enrolling keys
 make tree/db.auth
-make tree/dbx.auth
+make tree/dbx-blacklist.auth
 make disk.img
 ```
 
@@ -155,26 +156,53 @@ c8fa151a-b08d-5945-80ba-06dfb62481d9
 ```
 
 LVFS metadata firmware identifier must use the same GUID to match it with the
-update.
+update. Use the following template:
 
 ``` xml
+<?xml version="1.0" encoding="UTF-8"?>
 <component type="firmware">
-  <id>org.linuxfoundation.dbx.x64.firmware</id>
-  <name>Secure Boot dbx</name>
+  <id>org.canonical.dbx.x64.firmware</id>
+  <name>Secure Boot dbx (test)</name>
   <name_variant_suffix>x64</name_variant_suffix>
-  <summary>UEFI Secure Boot Forbidden Signature Database</summary>
+  <summary>DBX update</summary>
   <provides>
-    <!-- GUID from above -->
-    <firmware type="flashed">c8fa151a-b08d-5945-80ba-06dfb62481d9</firmware>
+    <!-- must match GUID of KEK -->
+    <firmware type="flashed">#### KEK GUID ####</firmware>
   </provides>
-  ...
+  <url type="homepage">https://uefi.org/revocationlistfile</url>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <categories>
+    <category>X-Configuration</category>
+    <category>X-System</category>
+  </categories>
+  <custom>
+    <value key="LVFS::VersionFormat">number</value>
+    <value key="LVFS::UpdateProtocol">org.uefi.dbx</value>
+  </custom>
+  <releases>
+    <release version="1" date="2024-09-24" urgency="high">
+      <description>
+        test update
+      </description>
+      <artifacts>
+        <artifact type="source">
+          <filename>dbx-update-blacklist.auth</filename>
+          <checksum type="sha256">#### CHECKSUM ####</checksum>
+        </artifact>
+      </artifacts>
+    </release>
+  </releases>
+  <requires>
+    <id compare="ge" version="1.9.1">org.freedesktop.fwupd</id>
+  </requires>
 </component>
 ```
 
 Pack everything into a cab file:
 
 ``` sh
-$ gcab -c -v dbx-v1111.cab dbx.auth dbx.auth.metainfo.xml
+$ gcab -c -v dbx-v1.cab dbx.auth dbx.auth.metainfo.xml
 dbx.auth
 dbx.auth.metainfo.xml
 ```
@@ -182,7 +210,7 @@ dbx.auth.metainfo.xml
 and place in the vendor directory:
 
 ``` sh
-cp dbx-v2.cab /var/snap/fwupd/common/share/fwupd/remotes.d/vendor/firmware/
+cp dbx-v1.cab /var/snap/fwupd/common/share/fwupd/remotes.d/vendor/firmware/
 fwupd.fwupdtool refresh
 ```
 
