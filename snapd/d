@@ -23,17 +23,28 @@ FLAGS = {
     "snap-bootstrap": STATIC_BUILD_FLAGS,
     "snap-update-ns": STATIC_BUILD_FLAGS,
     "snap-failure": STATIC_BUILD_FLAGS,
+    "snapctl": STATIC_BUILD_FLAGS,
     # the rest has no flags
     #"snapd": STATIC_BUILD_FLAGS,
 }
 TAGS = {
-    "snap": "-tags 'nomanagers nosecboot'",
+    "snap": "-tags nomanagers,nosecboot,nobolt,nobootloader",
     # the rest has no tags
     # "snapd": "-tags 'nosecboot'",
-    "snapd": "-tags 'withtestkeys'",
+    "snapd": "-tags 'withtestkeys,nobootloader'",
     "snap-bootstrap": "-tags 'osusergo'"
 }
 
+def guess_libexecdir() -> str:
+    try:
+        with open("/etc/os-release") as inf:
+            data = inf.read()
+            if "fedora" in data or "opensuse-tumbleweed" in data:
+                return "/usr/libexec/snapd"
+    except:
+        logging.exception("cannot load /etc/os-release")
+        pass
+    return "/usr/lib/snapd"
 
 def pre_action(what):
     if what == "snapd" and not DESTDIR:
@@ -51,7 +62,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="build helper")
     parser.add_argument("-b", "--just-build", action="store_true", help="just build")
     parser.add_argument("-t", "--tags", help="build tags to use (overrides defaults, if any)")
-    parser.add_argument('--libexecdir', help='snapd libexecdir', default=LIBEXECDIR)
+    parser.add_argument('--libexecdir', help='snapd libexecdir', default=None)
     parser.add_argument("what", help="binary to build")
     return parser.parse_known_args()
 
@@ -93,5 +104,8 @@ def main(opts, rest):
 if __name__ == "__main__":
     opts, rest = parse_arguments()
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(message)s")
+    if opts.libexecdir is None:
+        opts.libexecdir = guess_libexecdir()
+        logging.debug("libexecdir guessed to be %s", opts.libexecdir)
 
     main(opts, rest)
