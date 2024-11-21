@@ -110,6 +110,7 @@ exec qemu-system-${ARCH} \
                    -enable-kvm \
                    $SNAPSHOT \
                    -m 2048 \
+                   -cpu host \
                    -device ${NETIF},netdev=mynet0 \
                    -netdev user,id=mynet0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22 \
                    -serial telnet:127.0.0.1:${SERIAL_PORT},server,nowait \
