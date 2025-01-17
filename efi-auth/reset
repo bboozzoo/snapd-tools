@@ -1,0 +1,8 @@
+#!/bin/sh -x
+
+chattr -i /sys/firmware/efi/efivars/{PK,KEK,db,dbx}-*
+
+efitools.tool efi-updatevar -f empty.auth PK
+efitools.tool efi-updatevar -f empty.auth KEK
+efitools.tool efi-updatevar -f empty.auth db
+efitools.tool efi-updatevar -f empty.auth dbx

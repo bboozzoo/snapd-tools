@@ -1,0 +1,8 @@
+#!/bin/sh -x
+
+chattr -i /sys/firmware/efi/efivars/{PK,KEK,db,dbx}-*
+
+efitools.tool efi-updatevar -f PK.auth PK
+efitools.tool efi-updatevar -f KEK.auth KEK
+efitools.tool efi-updatevar -f db.auth db
+efitools.tool efi-updatevar -f dbx-blacklist.auth dbx
