@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="firmware">
+  <id>org.canonical.dbx.x64.firmware</id>
+  <name>Secure Boot dbx (test)</name>
+  <name_variant_suffix>x64</name_variant_suffix>
+  <summary>DBX update 1</summary>
+  <provides>
+    <firmware type="flashed">c8fa151a-b08d-5945-80ba-06dfb62481d9</firmware>
+  </provides>
+  <url type="homepage">https://uefi.org/revocationlistfile</url>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <categories>
+    <category>X-Configuration</category>
+    <category>X-System</category>
+  </categories>
+  <custom>
+    <value key="LVFS::VersionFormat">number</value>
+    <value key="LVFS::UpdateProtocol">org.uefi.dbx</value>
+  </custom>
+  <releases>
+    <release version="1" date="2024-09-24" urgency="high">
+      <description>
+        test update
+      </description>
+      <artifacts>
+        <artifact type="source">
+          <filename>dbx-update-blacklist.auth</filename>
+          <checksum type="sha256">3552642ca7f4d6f5cc107f42fc7552032f3e23bddbb1fd57a15d617ce9fb1830</checksum>
+        </artifact>
+      </artifacts>
+    </release>
+  </releases>
+  <requires>
+    <id compare="ge" version="1.9.1">org.freedesktop.fwupd</id>
+  </requires>
+</component>
