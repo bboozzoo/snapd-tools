@@ -1,0 +1,65 @@
+#!/bin/bash
+
+set -eu
+
+if [ -n "${D-}" ]; then
+    set -x
+fi
+
+if ! command -v gojq >/dev/null 2>&1; then
+    echo "gojq not found in PATH"
+    exit 1
+fi
+
+if [ -z "${UNSHARED-}" ]; then
+    echo "-- unsharing and executing"
+    exec sudo unshare  --mount --propagation=private -- bash -c "
+        cd $PWD;
+        export UNSHARED=1;
+        export SPREAD_VENV_USER=\"$(id -u -n)\";
+        export SPREAD_VENV_SHELL=\"$SHELL\";
+        export D=\"${D-}\";
+        exec ./spread-venv;
+        "
+fi
+
+if [ -z "${SPREAD_VENV_USER-}" ]; then
+    echo "SPREAD_VENV_USER is unset"
+    exit 1
+fi
+
+if [ -z "${SPREAD_VENV_SHELL-}" ]; then
+    echo "SPREAD_VENV_SHELL is unset"
+    exit 1
+fi
+
+echo "VENV_USER: $SPREAD_VENV_USER"
+echo "VENV_SHELL: $SPREAD_VENV_SHELL"
+unset D
+unset UNSHARED
+
+echo "-- current user after unshare"
+id
+echo "-- generating temporary spread.yaml"
+
+# shellcheck disable=SC2016
+su -c '
+set -e
+cd '"$PWD"'
+cp -v spread.yaml spread.yaml.tmp
+if [ -d spread-layers ]; then
+    find spread-layers/ -type f -o -type l | while read -r n; do
+        echo "-- merging $n"
+        gojq -s --yaml-output --yaml-input '\''.[0] * .[1]'\'' \
+            spread.yaml.tmp "$n" > spread.yaml.tmp.1
+        mv -v spread.yaml.tmp.1 spread.yaml.tmp
+    done
+else
+    echo "-- no spread-layers directory"
+fi
+' - "$SPREAD_VENV_USER"
+
+echo "-- mounting spread-temp.yaml onto spread.yaml"
+mount -o bind spread.yaml.tmp spread.yaml
+
+exec su -P -c "cd $PWD; export SPREAD_VENV=1; exec $SPREAD_VENV_SHELL" - "$SPREAD_VENV_USER"
