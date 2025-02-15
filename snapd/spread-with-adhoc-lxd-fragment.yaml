@@ -1,0 +1,39 @@
+backends:
+  adhoc-lxd:
+    type: adhoc
+    allocate: |
+      stderr_out="$(mktemp)"
+      trap "rv=\$?; rm "$stderr_out"; exit \$rv" EXIT
+
+      if out="$(spread-adhoc-allocator allocate \
+                 "$SPREAD_SYSTEM" \
+                 "$SPREAD_SYSTEM_USERNAME" \
+                 "$SPREAD_SYSTEM_PASSWORD" 2>"$stderr_out")"; then
+        ADDRESS "$out"
+      else
+        echo "allocation failed, log:"
+        cat "$stderr_out"
+        # FATAL does not work with multiline output
+        FATAL "$out"
+      fi
+    discard: |
+      spread-adhoc-allocator deallocate "$SPREAD_SYSTEM_ADDRESS"
+    systems:
+      - ubuntu-25.04-64:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-24.10-64:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-24.04-64:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-22.04-64:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-20.04-64:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-core-24-64:
+          username: ubuntu
+          password: ubuntu
