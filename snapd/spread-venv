@@ -11,6 +11,12 @@ if ! command -v yq >/dev/null 2>&1; then
     exit 1
 fi
 
+# ther are 2 projects using 'yq' name, we want the one in Go
+if ! yq --help 2>&1 |grep -q mikefarah/yq ; then
+    echo "unexpected version of yq, install go-yq (aka. yq-go)"
+    exit 1
+fi
+
 if [ -z "${UNSHARED-}" ]; then
     echo "-- unsharing and executing"
     exec sudo unshare  --mount --propagation=private -- bash -c "
