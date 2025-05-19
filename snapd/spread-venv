@@ -24,6 +24,7 @@ if [ -z "${UNSHARED-}" ]; then
         export UNSHARED=1;
         export SPREAD_VENV_USER=\"$(id -u -n)\";
         export SPREAD_VENV_SHELL=\"$SHELL\";
+        export SPREAD_VENV_XDG_RUNTIME_DIR=\"$XDG_RUNTIME_DIR\";
         export D=\"${D-}\";
         exec ./spread-venv;
         "
@@ -54,9 +55,13 @@ set -e
 cd '"$PWD"'
 cp -v spread.yaml spread.yaml.tmp
 if [ -d spread-layers ]; then
-    layers="$(find spread-layers/ -type f -o -type l | sort)"
-    echo "-- merging layers: $layers"
-    yq ea  '\''. as $item ireduce ({}; . * $item )'\'' spread.yaml $layers > spread.yaml.tmp
+   find spread-layers/ -type f -o -type l | sort | while read -r layer; do
+        set -x
+        [ -n "${D-}" ] && set -x || true
+        echo "-- merging $layer"
+        yq ea  '\''. as $item ireduce ({}; . * $item )'\'' spread.yaml.tmp $layer > spread.yaml.tmp.2
+        mv spread.yaml.tmp.2 spread.yaml.tmp
+    done
 else
     echo "-- no spread-layers directory"
 fi
@@ -65,4 +70,5 @@ fi
 echo "-- mounting spread-temp.yaml onto spread.yaml"
 mount -o bind spread.yaml.tmp spread.yaml
 
-exec su -P -c "cd $PWD; export SPREAD_VENV=1; exec $SPREAD_VENV_SHELL" - "$SPREAD_VENV_USER"
+exec su -P -c "cd $PWD; export SPREAD_VENV=1; export NO_REBUILD=1; export XDG_RUNTIME_DIR=$SPREAD_VENV_XDG_RUNTIME_DIR;
+     exec $SPREAD_VENV_SHELL" - "$SPREAD_VENV_USER"
